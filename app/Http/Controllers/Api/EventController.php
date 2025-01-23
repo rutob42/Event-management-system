@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Resources\EventResource;
 use App\Models\Event;
 use App\Http\Traits\CanLoadRelationships; // Corrected namespace
-use App\Http\Controllers\Controller;
+use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 
 class EventController extends Controller
@@ -15,6 +15,11 @@ class EventController extends Controller
     /**
      * Display a listing of the resource.
      */
+
+     public function __construct()
+     {
+        $this->middleware('auth:sanctum')->except(['index', 'show']);
+     }
     public function index()
     {
         $relations = ['user', 'attendees', 'attendees.user']; // List of relationships to optionally include
@@ -29,7 +34,7 @@ class EventController extends Controller
      */
     public function store(Request $request)
     {
-        // Creating a new event
+        // Validate and create a new event
         $event = Event::create([
             ...$request->validate([
                 'name' => 'required|string|max:255',
@@ -37,20 +42,23 @@ class EventController extends Controller
                 'start_time' => 'required|date',
                 'end_time' => 'required|date|after:start_time'
             ]),
-            'user_id' => 1
+            'user_id' => $request->user()->id
         ]);
-
-        return new EventResource($this->loadRelationships($event)); // Eager-load relationships
+    
+        // Load the user relationship and return the resource
+        return new EventResource($event->load('user', 'attendees'));
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Event $event)
+    public function show($id, Request $request) 
     {
-        $event->load('user', 'attendees');
-        return new EventResource($this->loadRelationships($event)); // Eager-load relationships
-    }
+        $event = Event::findOrFail($id);
+         // Load relationships based on the request
+        $event = $this->loadRelationships($event, ['user', 'attendees']);
+
+        return new EventResource($event);}
 
     /**
      * Update the specified resource in storage.
